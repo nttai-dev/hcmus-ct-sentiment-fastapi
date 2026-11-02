@@ -243,8 +243,10 @@ Example response (`422 Unprocessable Entity`):
 
 ## 7. A link to the demonstration video
 
-Replace `<YOUR_VIDEO_LINK>` below with the public YouTube or Google Drive URL after recording the demo:
+You can watch the demonstration video on YouTube by clicking the thumbnail or the direct link below:
 
-[![Watch the Demonstration Video](https://img.shields.io/badge/Watch_Demo_Video-YouTube_%2F_Google_Drive-red?style=for-the-badge&logo=youtube)](<YOUR_VIDEO_LINK>)
+[![Practice 01 Demonstration Video](https://img.youtube.com/vi/m35A8hclJJw/hqdefault.jpg)](https://youtu.be/m35A8hclJJw)
 
-Video link: [Practice 01 Demonstration Video](<YOUR_VIDEO_LINK>)
+YouTube link: [https://youtu.be/m35A8hclJJw](https://youtu.be/m35A8hclJJw)
+
+In the video, I introduce the `distilbert-base-uncased-finetuned-sst-2-english` model, walk through `config.yaml`, `model.py`, `main.py`, and `test_api.py`, run the FastAPI server locally on port 8000, and test the API with positive, negative, and invalid blank inputs.
