@@ -1,102 +1,116 @@
-# Sentiment analysis web API (Practice 01)
+# Sentiment Analysis Web API (Practice 01)
 
-I built this project for **Practice 01: Application Programming Interface** in the Computational Thinking course at FIT-HCMUS. It wraps a pre-trained Hugging Face sentiment model in a FastAPI server so you can send an English sentence over HTTP and get back a `POSITIVE` or `NEGATIVE` label with confidence scores in JSON.
+This repository is my submission for Practice 01 (Application Programming Interface) in the Computational Thinking course at VNU-HCM University of Science (FIT-HCMUS).
 
 ## 1. Student information
 
-| Field | Details |
+| Field | Information |
 | :--- | :--- |
 | Full name | Nguyễn Tấn Tài |
 | Student ID | 25127493 |
 | Class | 25C09 |
-| Course | Computational Thinking |
+| Course | Computational Thinking (Practice 01 - API) |
 | Lab instructors | Nguyen Ngoc Minh Chau, Le Duc Khoan |
 
-## 2. Selected model
+## 2. The name of the selected model and a link to its Hugging Face page
 
-I used [`distilbert/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english) from Hugging Face.
+Model name: `distilbert/distilbert-base-uncased-finetuned-sst-2-english`
 
-It is a DistilBERT model fine-tuned on the Stanford Sentiment Treebank (SST-2) dataset for binary sentiment classification. I picked it mainly for practical reasons: the weights are around 268 MB, it loads in about two seconds after the first download, and inference runs fast on a regular laptop CPU without needing a GPU.
+Hugging Face page: [https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english)
 
-## 3. How the system works
+This is a DistilBERT model fine-tuned on the Stanford Sentiment Treebank (SST-2) dataset for English binary sentiment classification (`POSITIVE` or `NEGATIVE`). I picked it because the weights are relatively small (around 268 MB), so it loads in a couple of seconds and runs fast on a normal laptop CPU without needing a dedicated GPU.
 
-The codebase is split into a few small files so the model logic stays separate from the HTTP routes:
+## 3. A brief description of the system's functionality
+
+The system wraps the Hugging Face sentiment model in a FastAPI web application so clients can send English text over HTTP and receive sentiment predictions in JSON format.
+
+I split the code into separate files to keep the model inference logic separate from the API routes:
 
 ```text
 .
-├── config.yaml          # Model checkpoint name and token limit (512)
-├── model.py             # SentimentClassifier class (tokenizer + PyTorch inference)
-├── main.py              # FastAPI app, Pydantic validation, and route handlers
-├── test_api.py          # Script using `requests` to test the live server
-├── notebook_dev.ipynb   # Notebook version for Google Colab / Jupyter
-├── requirements.txt     # Python dependencies
+├── config.yaml          # Model path and maximum token length (512)
+├── model.py             # SentimentClassifier wrapper around Hugging Face tokenizer and model
+├── main.py              # FastAPI app, Pydantic input validation, and route handlers
+├── test_api.py          # Client script that tests the API using the `requests` library
+├── notebook_dev.ipynb   # Notebook used during development on Google Colab / Jupyter
+├── requirements.txt     # Required Python dependencies
+├── README.md            # Project documentation
 └── tests/
-    └── test_unit.py     # Automated unit tests for pytest
+    └── test_unit.py     # Automated unit and endpoint tests for pytest
 ```
 
-When the server starts, `main.py` initializes `SentimentClassifier` using the settings in `config.yaml`. The API has three routes:
+When the app starts, `main.py` reads `config.yaml` and loads `SentimentClassifier` from `model.py` into memory. The API exposes three endpoints:
 
-1. `GET /` returns a short description of the service, the model name, and the list of endpoints.
-2. `GET /health` checks if `SentimentClassifier` loaded properly. It returns HTTP `200` when the model is ready in memory, or `503` if loading failed.
-3. `POST /predict` takes a JSON body like `{"text": "..."}`, runs the text through the DistilBERT tokenizer and model inside `torch.no_grad()`, applies `softmax` to convert raw logits into probabilities, and returns both the top label and the individual scores rounded to 4 decimal places.
+1. `GET /` returns a short introduction to the API, the model name, and a list of available routes.
+2. `GET /health` checks whether the model finished loading. It returns HTTP `200` when the model is ready, or HTTP `503` if model initialization failed.
+3. `POST /predict` receives a JSON payload containing a `"text"` field, tokenizes the text, runs inference inside `torch.no_grad()`, applies `softmax` to get probabilities, and returns the predicted label (`POSITIVE` or `NEGATIVE`) along with confidence scores rounded to 4 decimal places.
 
-To keep bad inputs from crashing the model, `PredictRequest` in `main.py` strips whitespace and rejects empty strings (`""` or `"   "`) with HTTP `422` before the tokenizer is ever called. In `model.py`, the tokenizer also sets `truncation=True` and `max_length=512` so long paragraphs do not trigger a tensor size error in DistilBERT.
+For input validation and error handling, `PredictRequest` in `main.py` strips leading/trailing spaces and rejects empty or whitespace-only strings (`""` or `"   "`) with HTTP `422 Unprocessable Entity` before calling the model. The tokenizer in `model.py` also truncates inputs longer than 512 tokens so long paragraphs do not crash DistilBERT. If an unexpected runtime error happens during inference, `POST /predict` catches it and returns HTTP `500` with a JSON error message.
 
-## 4. Installing dependencies
+## 4. Instructions for installing the required dependencies
 
-You will need Python 3.10 or newer. Clone the repository, create a virtual environment, and install the packages from `requirements.txt`:
+You need Python 3.10 or newer installed on your machine. Clone this repository, create a virtual environment, and install the packages listed in `requirements.txt`:
 
 ```powershell
-git clone https://github.com/tantai2512/hcmus-ct-sentiment-fastapi.git
+git clone https://github.com/nttai-dev/hcmus-ct-sentiment-fastapi.git
 cd hcmus-ct-sentiment-fastapi
 
-# Windows PowerShell
+# Create and activate a virtual environment on Windows PowerShell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
+# Install required dependencies
 pip install -r requirements.txt
 ```
 
-If you are on macOS or Linux, activate the environment with `source .venv/bin/activate` instead. The first time you run the app, `transformers` will download the 268 MB model checkpoint into your local Hugging Face cache.
+If you use macOS or Linux, activate the virtual environment with `source .venv/bin/activate`. On the first run, `transformers` downloads the 268 MB model checkpoint from Hugging Face Hub into your local cache folder.
 
-## 5. Running the application
+## 5. Instructions for running the application
 
-Start the FastAPI server locally with Uvicorn:
+Run the FastAPI server locally with Uvicorn:
 
 ```powershell
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Or run `main.py` directly:
+Or run `main.py` directly with Python:
 
 ```powershell
 python main.py
 ```
 
-Once you see `Application startup complete` in the terminal, the server is listening at `http://127.0.0.1:8000`. You can open `http://127.0.0.1:8000/docs` in your browser to test the endpoints through FastAPI's Swagger UI.
+Wait until the terminal prints `Application startup complete`. Once it is running, you can access:
+- Base API URL at `http://127.0.0.1:8000`
+- Interactive Swagger UI at `http://127.0.0.1:8000/docs`
+- ReDoc page at `http://127.0.0.1:8000/redoc`
 
-## 6. Calling the API
+## 6. Instructions for calling the API, including example requests and responses
 
-### Using the `requests` test script
+### 6.1 Testing with the Python `requests` script (`test_api.py`)
 
-While the Uvicorn server is running in one terminal, open a second terminal and run:
+Keep the Uvicorn server running in your first terminal, open a second terminal in the project folder, and run:
 
 ```powershell
 python test_api.py
 ```
 
-This script calls `GET /`, `GET /health`, and `POST /predict` (with positive, negative, product review, and invalid blank inputs) and prints the formatted JSON responses. You can also run the automated test suite without starting the server manually by running `pytest -v`.
+This script uses the `requests` library to call `GET /`, `GET /health`, and `POST /predict` (with positive, negative, product review, and invalid blank inputs) and prints the status codes and JSON responses.
 
-### Example 1: `GET /` (system overview)
+You can also run the automated `pytest` suite at any time with:
 
-Request:
+```powershell
+pytest -v
+```
+
+### 6.2 `GET /` (system introduction)
+
+Example request (`curl`):
 
 ```bash
 curl -X GET http://127.0.0.1:8000/
 ```
 
-Response (`200 OK`):
+Example response (`200 OK`):
 
 ```json
 {
@@ -112,15 +126,15 @@ Response (`200 OK`):
 }
 ```
 
-### Example 2: `GET /health` (health check)
+### 6.3 `GET /health` (operational status check)
 
-Request:
+Example request (`curl`):
 
 ```bash
 curl -X GET http://127.0.0.1:8000/health
 ```
 
-Response (`200 OK`):
+Example response (`200 OK`):
 
 ```json
 {
@@ -130,9 +144,9 @@ Response (`200 OK`):
 }
 ```
 
-### Example 3: `POST /predict` with a positive sentence
+### 6.4 `POST /predict` (Input 1: positive sentiment)
 
-Request (`curl`):
+Example request (`curl`):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/predict \
@@ -140,20 +154,20 @@ curl -X POST http://127.0.0.1:8000/predict \
   -d '{"text": "The lecture on FastAPI was clear, practical, and easy to follow!"}'
 ```
 
-Equivalent call in Python using `requests`:
+Example request (Python `requests`):
 
 ```python
 import requests
 
-resp = requests.post(
+response = requests.post(
     "http://127.0.0.1:8000/predict",
     json={"text": "The lecture on FastAPI was clear, practical, and easy to follow!"},
 )
-print(resp.status_code)
-print(resp.json())
+print(response.status_code)
+print(response.json())
 ```
 
-Response (`200 OK`):
+Example response (`200 OK`):
 
 ```json
 {
@@ -171,9 +185,9 @@ Response (`200 OK`):
 }
 ```
 
-### Example 4: `POST /predict` with a negative sentence
+### 6.5 `POST /predict` (Input 2: negative sentiment)
 
-Request (`curl`):
+Example request (`curl`):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/predict \
@@ -181,7 +195,7 @@ curl -X POST http://127.0.0.1:8000/predict \
   -d '{"text": "The app kept crashing every five minutes and lost all my saved work."}'
 ```
 
-Response (`200 OK`):
+Example response (`200 OK`):
 
 ```json
 {
@@ -199,9 +213,9 @@ Response (`200 OK`):
 }
 ```
 
-### Example 5: Validation error on empty input
+### 6.6 `POST /predict` (Validation error on empty/whitespace input)
 
-If you send an empty string or only spaces, Pydantic rejects the request with HTTP `422`:
+Example request (`curl`):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/predict \
@@ -209,7 +223,7 @@ curl -X POST http://127.0.0.1:8000/predict \
   -d '{"text": "   "}'
 ```
 
-Response (`422 Unprocessable Entity`):
+Example response (`422 Unprocessable Entity`):
 
 ```json
 {
@@ -227,10 +241,10 @@ Response (`422 Unprocessable Entity`):
 }
 ```
 
-## 7. Demonstration video
+## 7. A link to the demonstration video
 
-Replace `<YOUR_VIDEO_LINK>` below with the public YouTube or Google Drive link after recording:
+Replace `<YOUR_VIDEO_LINK>` below with the public YouTube or Google Drive URL after recording the demo:
 
-[![Watch the Demo Video](https://img.shields.io/badge/Watch_Demo_Video-YouTube_%2F_Google_Drive-red?style=for-the-badge&logo=youtube)](<YOUR_VIDEO_LINK>)
+[![Watch the Demonstration Video](https://img.shields.io/badge/Watch_Demo_Video-YouTube_%2F_Google_Drive-red?style=for-the-badge&logo=youtube)](<YOUR_VIDEO_LINK>)
 
-Direct link: [Practice 01 Demo Video](<YOUR_VIDEO_LINK>)
+Video link: [Practice 01 Demonstration Video](<YOUR_VIDEO_LINK>)
